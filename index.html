@@ -405,7 +405,7 @@ function renderInputs() {
       e.oninput = () => { menu[i][f] = e.value; render(); }; return e; };
     const del = document.createElement("button"); del.textContent = "✕"; del.className = "text-red-400 text-xs px-2";
     del.onclick = () => { if (menu.length > 1) { menu.splice(i, 1); renderInputs(); render(); } };
-    row.append(mk("name", "flex-1 min-w-0"), mk("price", "w-20"), mk("cat", "w-20"), del); box.appendChild(row);
+    row.append(mk("name", "flex-1 min-w-0"), mk("price", "w-24"), del); box.appendChild(row);
   });
 }
 function addItem() { menu.push({name: T("មុខម្ហូបថ្មី / New dish"), price: "4,000៛"}); renderInputs(); render(); }
