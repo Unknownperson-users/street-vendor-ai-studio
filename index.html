@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Street Vendor AI Studio - ស្ទូឌីយូបង្កើតផ្ទាំងផ្សាយ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+body{font-family:'Kantumruy Pro',system-ui,sans-serif}
+/* Light palettes: dark text and light panels, so any colour (even pink) stays readable */
+#poster.light{color:#1c1917}
+#poster.light [class*="bg-black/"]{background:rgba(255,255,255,.65)!important}
+#poster.light [class*="border-white/"]{border-color:rgba(0,0,0,.2)!important}
+#poster.light .text-stone-900{color:#fff}
+#poster.light .drop-shadow-md{filter:none}
+body.lang-km .en{display:none}
+body.lang-en .km{display:none}
+</style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen pb-12">
+
+<header class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+  <span class="font-bold text-lg">🛒 ស្ទូឌីយូអ្នកលក់ដូរ / Vendor Studio</span>
+  <div class="flex items-center gap-2">
+    <div class="flex rounded-lg overflow-hidden border border-slate-600 text-sm font-semibold">
+      <button id="langKm" onclick="setLang('km')" class="px-3 py-1.5">ខ្មែរ</button>
+      <button id="langEn" onclick="setLang('en')" class="px-3 py-1.5">English</button>
+    </div>
+    <button id="logoutBtn" onclick="logout()" class="hidden px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-semibold">ចាកចេញ / Log out</button>
+  </div>
+</header>
+
+<div id="view-studio" class="hidden">
+<main class="max-w-7xl mx-auto px-4 mt-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+<!-- CONTROLS -->
+<div id="leftCol" class="lg:col-span-5 space-y-5">
+
+  <!-- Describe it and let AI design -->
+  <section class="bg-slate-800 p-5 rounded-xl border border-orange-500/40 space-y-3">
+    <label for="ask" class="text-sm font-bold block">✨ ប្រាប់ AI ថាអ្នកចង់បានអ្វី / Tell the AI what you want</label>
+    <textarea id="ask" rows="3" placeholder="ឧ. ផ្ទាំងបើកហាងថ្មី ពណ៌ផ្កាឈូក កាហ្វេទឹកកក 3000៛, នំ 2500៛&#10;e.g. Grand opening poster, pink colors, iced coffee 3000, croissant 2500" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea>
+    <button id="askBtn" onclick="generateFromPrompt()" class="w-full py-3 bg-orange-500 hover:bg-orange-600 rounded-lg font-bold">✨ បង្កើតផ្ទាំង / Generate poster</button>
+    <p class="text-xs text-slate-400">AI នឹងបំពេញជំហានខាងក្រោមឱ្យ ហើយអ្នកអាចពិនិត្យ និងកែបាន។<br>The AI fills in the steps below for you. You can check and change anything afterwards.</p>
+    <p id="askNote" class="text-xs text-slate-400 min-h-4"></p>
+  </section>
+
+  <details class="bg-slate-800 border border-slate-700 rounded-xl">
+  <summary class="cursor-pointer text-sm font-bold p-4">🎛️ កែសម្រួលដោយដៃ / Fine-tune poster type and colors (optional)</summary>
+  <div class="space-y-5 p-4 pt-0">
+  <!-- Poster type -->
+  <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-3">
+    <label class="text-sm font-bold block">🖼️ ប្រភេទផ្ទាំង / Poster type</label>
+    <div id="layouts" class="grid grid-cols-2 gap-2"></div>
+  </section>
+
+  <!-- Colors -->
+  <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-3">
+    <label class="text-sm font-bold block">🎨 ពណ៌ / Colors</label>
+    <div id="swatches" class="grid grid-cols-6 gap-2"></div>
+    <input id="vibe" placeholder="ឧ. ផ្កាឈូក ក្រហម បៃតង កាហ្វេ / e.g. pink, red, green, coffee" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+    <div class="flex gap-2">
+      <button onclick="newRandomPalette()" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-semibold">🎲 Random colors</button>
+      <button id="aiBtn" onclick="aiPalette()" class="flex-1 py-2 bg-orange-500 hover:bg-orange-600 rounded-lg text-sm font-semibold">✨ AI colors</button>
+    </div>
+    <p id="colorNote" class="text-xs text-slate-400 min-h-4"></p>
+  </section>
+
+  </div>
+  </details>
+
+  <!-- Shop info -->
+  <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-3">
+    <div>
+      <label class="text-xs font-semibold block mb-1">ឈ្មោះហាង / Shop name</label>
+      <input id="shop" value="ចែមុំកាហ្វេដោះគោត និងបាយស្រូប" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="text-xs font-semibold block mb-1">ពាក្យស្លោក / Tagline</label>
+      <input id="tagline" value="ឈ្ងុយឆ្ងាញ់ ពិសាហើយចង់ពិសាទៀត!" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="text-xs font-semibold block mb-1">☎️ លេខទូរស័ព្ទ / Phone</label>
+      <input id="phone" value="012 888 999" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="text-xs font-semibold block mb-1">ស្ទីកគ័រ / Badge</label>
+      <input id="badge" value="🔥 ម្ហូបឆ្ងាញ់ប្រចាំហាង" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+      <div class="flex flex-wrap gap-2 pt-2" id="badgeBtns"></div>
+    </div>
+    <div>
+      <label class="text-xs font-semibold block mb-1">ពាក្យលេចធ្លោ / Highlight (Festival, Promo)</label>
+      <input id="callout" value="បើកហើយ!" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="text-xs font-semibold block mb-1">ម៉ោង ថ្ងៃ ឬអាសយដ្ឋាន / Date, time or address</label>
+      <input id="info" value="រាល់ថ្ងៃ ៦ព្រឹក – ១០យប់ / Daily 6am – 10pm" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+    </div>
+  </section>
+
+  <!-- QR options -->
+  <section class="bg-slate-800 p-5 rounded-xl border border-cyan-500/30 space-y-4">
+    <label class="text-sm font-bold block">📱 QR កូដ / QR codes (both optional)</label>
+
+    <div class="space-y-2">
+      <label class="text-xs font-semibold block">1. QR ទូទាត់ / Payment QR (any bank or wallet)</label>
+      <p class="text-xs text-slate-400">បើកកម្មវិធី ABA, Wing, ACLEDA, Bakong ឬ KHQR ផ្សេងៗ រក្សាទុករូប QR របស់អ្នក រួចបញ្ចូលនៅទីនេះ។ កម្មវិធីធនាគារណាក៏ស្កែនបាន។<br>Open your ABA, Wing, ACLEDA, Bakong or any KHQR app, save or screenshot your own QR, and upload it here. Any bank app can scan it.</p>
+      <input type="file" id="payFile" accept="image/*" class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-cyan-600 file:text-white file:font-semibold">
+      <input id="payLabel" value="ABA · Wing · ACLEDA · Bakong" placeholder="Label under the QR" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+      <button onclick="clearPay()" class="text-xs text-red-400 hover:underline">Remove payment QR</button>
+    </div>
+
+    <div class="space-y-2">
+      <label class="text-xs font-semibold block">2. QR តំណ / Link QR (Telegram, Facebook, Google Maps…)</label>
+      <input id="qrLink" value="https://t.me/CambodiaStreetFood" placeholder="https://… (leave empty for none)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+      <input id="linkLabel" value="Telegram" placeholder="Label under the QR" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs">
+    </div>
+
+    <p class="text-xs text-amber-300">⚠️ ប្រើរូប QR ពីកម្មវិធីធនាគាររបស់អ្នកផ្ទាល់។ កុំបង្កើត QR ទូទាត់ពីតំណដែលវាយបញ្ចូល។ មុនបោះពុម្ព សូមស្កែនផ្ទាំងដែលបានបញ្ចប់ដោយកម្មវិធីធនាគារ។<br>Use the QR image from your own bank app. Do not make a payment QR from a typed link. Scan your finished poster with a bank app before printing.</p>
+  </section>
+
+  <!-- Menu -->
+  <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-2">
+    <div class="flex justify-between items-center">
+      <label class="text-xs font-semibold">មុខម្ហូប និងតម្លៃ / Menu and prices</label>
+      <button onclick="addItem()" class="text-xs text-orange-400 font-semibold hover:underline">+ Add dish</button>
+    </div>
+    <div id="menuInputs" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+    <label class="text-xs font-semibold block pt-2">រូបថត / Photo</label>
+    <input type="file" id="photoFile" accept="image/*" class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-orange-500 file:text-white file:font-semibold">
+  </section>
+</div>
+
+<!-- POSTER -->
+<div class="lg:col-span-7 flex flex-col items-center gap-4 lg:sticky lg:top-4 lg:self-start">
+  <div class="w-full flex justify-center overflow-x-auto">
+    <div id="poster" class="w-[380px] min-h-[460px] rounded-2xl p-6 text-white shadow-2xl relative flex flex-col justify-between border-4 overflow-hidden flex-shrink-0">
+      <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none"></div>
+      <div id="bunting" class="absolute top-0 inset-x-0 z-10 justify-around" style="display:none"></div>
+
+      <div class="relative z-10">
+        <div class="flex justify-between items-start gap-3">
+          <div class="flex-1">
+            <span id="pBadge" class="inline-block px-3 py-1 text-xs font-bold rounded-full shadow-md mb-2 text-stone-900"></span>
+            <h2 id="pShop" class="text-2xl font-bold leading-tight drop-shadow-md"></h2>
+            <p id="pTag" class="text-xs opacity-90 mt-1 italic"></p>
+          </div>
+          <div class="w-16 h-16 rounded-full border-2 shadow-lg overflow-hidden flex-shrink-0 bg-black/20 flex items-center justify-center" id="photoBox">
+            <span id="photoPh" class="text-2xl">👩‍🍳</span>
+            <img id="photoImg" class="w-full h-full object-cover hidden" alt="">
+          </div>
+        </div>
+        <hr class="mt-3 border-white/30">
+      </div>
+
+      <div id="pMenu" class="relative z-10 my-5 flex-1"></div>
+
+      <div class="relative z-10 bg-black/30 p-3 rounded-xl border border-white/10 flex items-center justify-between gap-3">
+        <p class="text-xs font-bold">☎️ <span id="pPhone"></span></p>
+        <div id="pQRs" class="flex gap-2"></div>
+      </div>
+    </div>
+  </div>
+  <button onclick="downloadPoster()" class="w-full max-w-[380px] py-3 bg-orange-500 hover:bg-orange-600 rounded-xl font-bold shadow-lg">📥 ទាញយក / Download PNG</button>
+  <p id="dlNote" class="text-xs text-slate-400"></p>
+</div>
+</main>
+</div>
+
+
+<!-- ============ PAGE 1: WELCOME + LOGIN ============ -->
+<div id="view-login" class="max-w-md mx-auto px-4 py-10 space-y-6">
+  <div class="text-center space-y-2">
+    <h1 class="text-3xl font-black leading-tight">បង្កើតផ្ទាំងម៉ឺនុយ ឥតគិតថ្លៃ<br><span class="text-orange-400">Make your menu poster for free</span></h1>
+    <p class="text-slate-300 text-sm">សម្រាប់អ្នកលក់អាហារ។ និយាយអ្វីដែលអ្នកចង់បាន AI នឹងរចនាឱ្យ។<br>Tell the AI what you want and it designs it for you.</p>
+  </div>
+
+  <section id="loginForm" class="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-3">
+    <div>
+      <label for="loginShop" class="text-sm font-semibold block mb-1">ឈ្មោះហាង / Shop name</label>
+      <input id="loginShop" onkeydown="if(event.key==='Enter')login()" placeholder="ឧ. ចែមុំកាហ្វេ / e.g. Auntie Lin's Noodles" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3">
+    </div>
+    <div>
+      <label for="loginPhone" class="text-sm font-semibold block mb-1">លេខទូរស័ព្ទ / Phone (optional)</label>
+      <input id="loginPhone" onkeydown="if(event.key==='Enter')login()" inputmode="tel" placeholder="012 345 678" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3">
+    </div>
+    <button onclick="login()" class="w-full py-3 bg-orange-500 hover:bg-orange-600 rounded-xl font-bold text-lg">ចូល / Enter</button>
+    <p id="loginNote" class="text-xs text-amber-300 min-h-4"></p>
+    <p class="text-xs text-slate-400">គ្មានពាក្យសម្ងាត់ទេ។ ព័ត៌មានរក្សាទុកក្នុងឧបករណ៍នេះប៉ុណ្ណោះ។<br>No password needed. Your details stay on this device only.</p>
+  </section>
+
+  <section id="welcome" class="hidden bg-slate-800 border border-orange-500/40 rounded-xl p-8 text-center space-y-3">
+    <div class="text-5xl animate-pulse">🍜</div>
+    <h2 class="text-xl font-bold">សូមស្វាគមន៍ / Welcome, <span id="welcomeName"></span>!</h2>
+    <p class="text-sm text-slate-400">កំពុងរៀបចំស្ទូឌីយូរបស់អ្នក… / Getting your studio ready…</p>
+  </section>
+</div>
+
+<script>
+/* AI SETTINGS: leave empty for offline mode. Put the URL of your serverless function here
+   (it holds your Gemini key and returns { "text": "..." }). Never put the key in this file. */
+const AI_ENDPOINT = "";
+
+const $ = id => document.getElementById(id);
+
+/* ---------- language: Khmer or English (one at a time) ---------- */
+const lang = {v: (() => { try { return localStorage.getItem("vendorLang") || "km"; } catch (e) { return "km"; } })()};
+const DICT = {   // English-only texts and their Khmer (please have a native speaker review these)
+  "🎲 Random colors": "🎲 ពណ៌ចៃដន្យ", "✨ AI colors": "✨ ពណ៌ពី AI", "Remove payment QR": "លុប QR ទូទាត់", "+ Add dish": "+ បន្ថែមមុខម្ហូប",
+  "Label under the QR": "អក្សរនៅក្រោម QR", "https://… (leave empty for none)": "https://… (ទុកទទេ បើមិនមាន)", "Group": "ក្រុម",
+  "Asking AI for colors…": "កំពុងសួរ AI រកពណ៌…", "AI colors applied.": "បានប្រើពណ៌ពី AI ហើយ។",
+  "AI was unavailable, so random colors were used.": "AI មិនអាចប្រើបាន ដូច្នេះប្រើពណ៌ចៃដន្យជំនួស។",
+  "AI not connected yet, so a smart random palette was used. Set AI_ENDPOINT to enable AI.": "មិនទាន់ភ្ជាប់ AI ទេ ដូច្នេះប្រើពណ៌ចៃដន្យដែលស្មានតាមពាក្យ។ កំណត់ AI_ENDPOINT ដើម្បីប្រើ AI។",
+  "Download tool did not load. Check your internet.": "ឧបករណ៍ទាញយកមិនដំណើរការ។ សូមពិនិត្យអ៊ីនធឺណិត។",
+  "AI was unavailable, so the basic keyword version was used.": "AI មិនអាចប្រើបាន ដូច្នេះប្រើកំណែសាមញ្ញតាមពាក្យគន្លឹះ។",
+  "Demo mode: basic keyword version. Set AI_ENDPOINT for full AI.": "របៀបសាកល្បង៖ កំណែសាមញ្ញតាមពាក្យគន្លឹះ។ កំណត់ AI_ENDPOINT ដើម្បីប្រើ AI ពេញលេញ។"
+};
+const DEFAULTS = {badge: {km: "🔥 ម្ហូបឆ្ងាញ់ប្រចាំហាង", en: "🔥 House special"}, callout: {km: "បើកហើយ!", en: "Now open!"}};
+const KMRE = /[\u1780-\u17FF]/, LATRE = /[A-Za-z]/;
+function T(s) {          // "ខ្មែរ / English" -> the chosen half; English-only text -> its Khmer from DICT
+  const i = s.indexOf(" / ");
+  if (i > -1 && KMRE.test(s.slice(0, i)) && LATRE.test(s.slice(i + 3))) return lang.v === "km" ? s.slice(0, i) : s.slice(i + 3);
+  return lang.v === "km" && DICT[s] ? DICT[s] : s;
+}
+function lockNotes() {   // every message written into these boxes is shown in the chosen language
+  const d = Object.getOwnPropertyDescriptor(Node.prototype, "textContent");
+  ["askNote", "colorNote", "loginNote", "dlNote"].forEach(id => Object.defineProperty($(id), "textContent", {get() { return d.get.call(this); }, set(v) { d.set.call(this, T(String(v))); }}));
+}
+function wrapBilingual() {   // runs once: splits every "ខ្មែរ / English" text in the page into two spans
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), nodes = [];
+  while (w.nextNode()) nodes.push(w.currentNode);
+  const span = (cls, txt) => { const e = document.createElement("span"); e.className = cls; e.textContent = txt; return e; };
+  nodes.forEach(n => {
+    const p = n.parentNode, t = n.nodeValue;
+    if (!p || !t.trim() || p.closest("#poster, script, style, textarea, .km, .en")) return;
+    const i = t.indexOf(" / "), nx = n.nextSibling, after = nx && nx.nodeName === "BR" ? nx.nextSibling : null;
+    if (i > -1 && KMRE.test(t.slice(0, i)) && LATRE.test(t.slice(i + 3))) n.replaceWith(span("km", t.slice(0, i) + " "), span("en", t.slice(i + 3)));
+    else if (KMRE.test(t) && after && !KMRE.test(after.textContent) && LATRE.test(after.textContent)) {       // Khmer line, <br>, English line
+      nx.className = "km"; n.replaceWith(span("km", t));
+      if (after.nodeType === 3) after.replaceWith(span("en", after.nodeValue)); else after.classList.add("en");
+    } else if (LATRE.test(t) && !KMRE.test(t) && DICT[t.trim()]) n.replaceWith(span("km", DICT[t.trim()]), span("en", t));
+  });
+}
+function setPlaceholders() {
+  document.querySelectorAll("[placeholder]").forEach(e => {
+    if (!e.dataset.ph) e.dataset.ph = e.getAttribute("placeholder");
+    const t = e.dataset.ph, nl = t.indexOf("\n"), sl = t.indexOf(" / ");
+    const cut = nl > -1 ? [nl, 1] : sl > -1 && KMRE.test(t.slice(0, sl)) ? [sl, 3] : null;
+    e.setAttribute("placeholder", cut ? (lang.v === "km" ? t.slice(0, cut[0]) : t.slice(cut[0] + cut[1])) : T(t));
+  });
+}
+const BADGES = ["🔥 ពេញនិយម / 🔥 Hot Pick", "⭐ ណែនាំ / ⭐ Chef pick", "🥤 ទិញ ១ ថែម ១ / 🥤 Buy 1 Get 1", "🌶️ ហឹរខ្លាំង / 🌶️ Super spicy"];
+function renderBadgeBtns() {
+  const box = $("badgeBtns"); box.innerHTML = "";
+  BADGES.forEach(x => { const t = T(x), b = document.createElement("button"); b.textContent = t; b.className = "px-2.5 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs";
+    b.onclick = () => { $("badge").value = t; render(); }; box.appendChild(b); });
+}
+function setLang(v) {
+  lang.v = v; try { localStorage.setItem("vendorLang", v); } catch (e) {}
+  document.body.classList.toggle("lang-km", v === "km"); document.body.classList.toggle("lang-en", v === "en"); document.documentElement.lang = v;
+  $("langKm").className = "px-3 py-1.5 " + (v === "km" ? "bg-orange-500" : "bg-slate-800");
+  $("langEn").className = "px-3 py-1.5 " + (v === "en" ? "bg-orange-500" : "bg-slate-800");
+  Object.entries(DEFAULTS).forEach(([id, d]) => { if ([d.km, d.en].includes($(id).value)) $(id).value = d[v]; });
+  renderInputs(); renderLayouts(); renderBadgeBtns(); setPlaceholders();
+  if ($("stepBar")) showStep(step);
+  render();
+}
+function showPoster() { if (window.innerWidth < 1024) $("poster").scrollIntoView({behavior: "smooth", block: "center"}); }
+const PRESETS = [
+  {a:"#b45309", b:"#991b1b", e:"#fcd34d", c:"#fde68a"},  // Khmer gold
+  {a:"#581c87", b:"#1e1b4b", e:"#f472b6", c:"#f9a8d4"},  // Neon night
+  {a:"#065f46", b:"#042f2e", e:"#34d399", c:"#a7f3d0"},  // Forest
+  {a:"#c2410c", b:"#9f1239", e:"#fdba74", c:"#fed7aa"},  // Sunset
+  {a:"#1d4ed8", b:"#0f172a", e:"#67e8f9", c:"#a5f3fc"},  // Royal blue
+  {a:"#1e293b", b:"#0f172a", e:"#64748b", c:"#e2e8f0"}   // Chalkboard
+];
+let palettes = [...PRESETS], pal = PRESETS[0];
+let menu = [{name:"កាហ្វេទឹកដោះគោ (Iced Milk Coffee)", price:"3,500៛"}, {name:"បាយសាច់ជ្រូកបំពង (Pork Rice)", price:"5,000៛"}];
+let payImg = null, photoImg = null;
+let layout = "menu", photoSrc = null;
+const LAYOUTS = [["menu", "ម៉ឺនុយ / Menu list"], ["cards", "កាត / Cards"], ["board", "ក្តារតម្លៃ / Price board"], ["promo", "ប្រូម៉ូសិន / Promo"],
+                 ["truck", "ម៉ឺនុយតាមក្រុម / Sections"], ["festival", "ពិធីបុណ្យ / Festival"], ["hero", "រូបធំ / Big photo"]];
+function renderLayouts() {
+  const box = $("layouts"); box.innerHTML = "";
+  LAYOUTS.forEach(([id, label]) => {
+    const b = document.createElement("button"); b.textContent = T(label);
+    b.className = "py-2 px-2 rounded-lg text-xs font-semibold border-2 " + (id === layout ? "border-orange-400 bg-slate-700" : "border-slate-700 bg-slate-900");
+    b.onclick = () => { layout = id; renderLayouts(); render(); showPoster(); };
+    box.appendChild(b);
+  });
+}
+
+/* ---------- colour helpers ---------- */
+const hexOk = h => /^#[0-9a-f]{6}$/i.test(h);
+function hsl(h, s, l) {
+  h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))));
+  return "#" + [f(0), f(8), f(4)].map(v => v.toString(16).padStart(2, "0")).join("");
+}
+function lum(hex) {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.substr(i, 2), 16) / 255)
+    .map(v => v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4));
+  return .2126 * r + .7152 * g + .0722 * b;
+}
+function darken(hex, max = .12) {   // lower the brightness until it is at or under `max`
+  let c = hex;
+  while (lum(c) > max) c = "#" + [1, 3, 5].map(i => Math.round(parseInt(c.substr(i, 2), 16) * .85).toString(16).padStart(2, "0")).join("");
+  return c;
+}
+function paletteFromHue(h, s = 65, light = false, shift = 0, lt = [93, 84]) {   // lt = top and bottom lightness of light palettes
+  if (light) return {a: hsl(h, s, lt[0]), b: hsl(h, s, lt[1]), e: hsl(h, s, Math.min(52, lt[1] - 12)), c: hsl(h, s, 26), light: true};
+  const sa = Math.min(s, 90);
+  return {a: hsl(h, s, 30), b: hsl(h + shift, s, 12), e: hsl(h + shift * 1.6, sa, 68), c: hsl(h + shift * 1.6, sa, 82), light: false};
+}
+/* Colour and mood words in English and Khmer: [pattern, hue, saturation, light background by default] */
+const COLOR_WORDS = [
+  [/pink|rose|ផ្កាឈូក|ក្រមៅ|ផ្អែម|sweet|cake|dessert|candy|នំ/i, 335, 80, true],
+  [/purple|violet|ពណ[\u17CB-\u17D0]?ស្វាយ/i, 275, 60, false],
+  [/red|spic|chili|bbq|grill|ក្រហម|ហឹរ/i, 2, 72, false],
+  [/orange|ទឹកក្រូច|ក្រូច/i, 24, 88, false],
+  [/ripe|golden|លឿងទុំ/i, 44, 96, true, [60, 48]],
+  [/yellow|lemon|លឿង/i, 52, 96, true, [66, 54]],
+  [/gold|golden|sun|mango|មាស/i, 42, 80, false],
+  [/sky|ផ្ទៃមេឃ|light blue/i, 200, 85, true],
+  [/blue|ocean|sea|cold|ice|fish|ខៀវ|សមុទ្រ|ទឹកកក/i, 215, 70, false],
+  [/green|fresh|salad|herb|veg|បៃតង|ស្រស់/i, 145, 62, false],
+  [/brown|coffee|tea|milk|ត្នោត|កាហ្វេ|តែ/i, 25, 45, false],
+  [/black|ខ្មៅ/i, 0, 0, false],
+  [/white|ពណ[\u17CB-\u17D0]?ស(?![\u1780-\u17FF])/i, 0, 0, true]
+];
+function pickColor(text) {
+  const hit = COLOR_WORDS.find(x => x[0].test(text || ""));
+  if (!hit) return null;
+  let light = hit[3];
+  if (/\bdark\b|ងងឹត|ចាស់/i.test(text)) light = false;
+  if (/\blight\b|pastel|ស្រាល|ភ្លឺ/i.test(text)) light = true;
+  return {h: hit[1], s: hit[2], light, lt: hit[4]};
+}
+function colorFromText(t) {
+  const c = pickColor(t);
+  return c ? paletteFromHue(c.h, c.s, c.light, 0, c.lt) : paletteFromHue(Math.random() * 360, 65, Math.random() < .3, 25);
+}
+function fitPalette(p) {   // any 4 colours become readable: dark background + bright accent, or light background + dark accent
+  const light = (lum(p.a) + lum(p.b)) / 2 > .3;
+  return light ? {a: p.a, b: p.b, e: darken(p.e, .25), c: darken(p.c, .1), light: true}
+               : {a: darken(p.a), b: darken(p.b), e: p.e, c: p.c, light: false};
+}
+
+function newRandomPalette() {
+  const c = pickColor($("vibe").value);
+  addPalette(c ? paletteFromHue(c.h + (Math.random() * 20 - 10), c.s, c.light, 0, c.lt) : paletteFromHue(Math.random() * 360, 65, Math.random() < .3, 25));
+  $("colorNote").textContent = c ? "ពណ៌ពីពាក្យរបស់អ្នក / Colors made from your words. Press again for a variation."
+                                 : "ពណ៌ចៃដន្យ / Random colors. Type a color or mood (pink, ក្រហម, fresh…) to guide them.";
+}
+async function aiPalette() {
+  const v = $("vibe").value.trim() || $("shop").value;
+  if (!AI_ENDPOINT) { newRandomPalette(); $("colorNote").textContent = "AI not connected yet, so a smart random palette was used. Set AI_ENDPOINT to enable AI."; return; }
+  $("aiBtn").disabled = true; $("colorNote").textContent = "Asking AI for colors…";
+  try {
+    const prompt = `Design a poster colour palette for a street food shop. Mood or shop: "${v}".
+Reply ONLY with JSON: {"a":"#hex top background","b":"#hex bottom background","e":"#hex border","c":"#hex accent"}.
+Match any color named in any language (pink must really look pink). Use either dark backgrounds with bright border and accent, or light backgrounds with a dark accent.`;
+    const t = await askAI(prompt);
+    if (![t.a, t.b, t.e, t.c].every(hexOk)) throw new Error("bad colors");
+    addPalette(fitPalette(t));
+    $("colorNote").textContent = "AI colors applied.";
+  } catch (err) { newRandomPalette(); $("colorNote").textContent = "AI was unavailable, so random colors were used."; }
+  $("aiBtn").disabled = false;
+}
+function addPalette(p) { palettes.push(p); if (palettes.length > 18) palettes.splice(6, 1); pal = p; renderSwatches(); applyPalette(); showPoster(); }
+function renderSwatches() {
+  const box = $("swatches"); box.innerHTML = "";
+  palettes.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "h-10 rounded-lg border-2 " + (p === pal ? "border-white" : "border-transparent");
+    b.style.background = `linear-gradient(135deg,${p.a},${p.b})`;
+    b.setAttribute("aria-label", "Choose colors");
+    b.onclick = () => { pal = p; renderSwatches(); applyPalette(); showPoster(); };
+    box.appendChild(b);
+  });
+}
+function applyPalette() {
+  const p = $("poster");
+  p.classList.toggle("light", !!pal.light);
+  p.style.background = `linear-gradient(to bottom,${pal.a},${pal.b})`;
+  p.style.borderColor = pal.e + "66";
+  p.style.setProperty("--acc", pal.c);
+  $("pBadge").style.background = pal.c;
+  $("photoBox").style.borderColor = pal.c;
+  $("pTag").style.color = pal.c;
+  render();
+}
+
+/* ---------- menu + poster (textContent only, so typed text can never inject HTML) ---------- */
+function renderInputs() {
+  const box = $("menuInputs"); box.innerHTML = "";
+  menu.forEach((it, i) => {
+    const row = document.createElement("div"); row.className = "flex gap-2";
+    const mk = (f, cls) => { const e = document.createElement("input"); e.value = it[f] || ""; e.placeholder = f === "cat" ? T("Group") : "";
+      e.className = cls + " bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs";
+      e.oninput = () => { menu[i][f] = e.value; render(); }; return e; };
+    const del = document.createElement("button"); del.textContent = "✕"; del.className = "text-red-400 text-xs px-2";
+    del.onclick = () => { if (menu.length > 1) { menu.splice(i, 1); renderInputs(); render(); } };
+    row.append(mk("name", "flex-1 min-w-0"), mk("price", "w-20"), mk("cat", "w-20"), del); box.appendChild(row);
+  });
+}
+function addItem() { menu.push({name: T("មុខម្ហូបថ្មី / New dish"), price: "4,000៛"}); renderInputs(); render(); }
+
+function makeQR(parent, src, label, isImage) {
+  const wrap = document.createElement("div"); wrap.className = "text-center";
+  const box = document.createElement("div"); box.className = "bg-white p-1.5 rounded-lg shadow-md flex items-center justify-center";
+  box.style.width = box.style.height = "84px";
+  if (isImage) { const im = document.createElement("img"); im.src = src; im.style.cssText = "max-width:100%;max-height:100%;object-fit:contain"; box.appendChild(im); }
+  else new QRCode(box, {text: src, width: 72, height: 72, correctLevel: QRCode.CorrectLevel.M});
+  const cap = document.createElement("div"); cap.className = "text-[9px] mt-1 max-w-[84px] leading-tight"; cap.textContent = label;
+  wrap.append(box, cap); parent.appendChild(wrap);
+}
+const dishes = () => menu.filter(i => i.name.trim());
+function render() {
+  $("callout").parentElement.style.display = ["promo", "festival"].includes(layout) ? "" : "none";
+  $("info").parentElement.style.display = ["festival", "hero"].includes(layout) ? "" : "none";
+  $("pShop").textContent = $("shop").value || T("ឈ្មោះហាង / Shop name");
+  $("pTag").textContent = $("tagline").value;
+  $("pPhone").textContent = $("phone").value;
+  $("pBadge").textContent = $("badge").value; $("pBadge").style.display = $("badge").value ? "inline-block" : "none";
+  const m = $("pMenu"); m.innerHTML = "";
+  const grid = layout === "cards" || layout === "promo";
+  m.className = "relative z-10 my-5 flex-1 " + (grid ? "grid grid-cols-2 gap-3 content-center" : "flex flex-col justify-center gap-3");
+  $("pShop").className = (layout === "promo" ? "text-4xl uppercase font-black" : "text-2xl font-bold") + " leading-tight drop-shadow-md";
+  // Fewer dishes get bigger text, so the poster stays full instead of empty.
+  const big = dishes().length <= 3 ? "text-lg py-4" : dishes().length <= 6 ? "text-sm py-3" : "text-xs py-2";
+  const special = ["truck", "festival", "hero"].includes(layout);
+  $("photoBox").style.display = layout === "hero" ? "none" : "";
+  $("bunting").style.display = layout === "festival" ? "flex" : "none";
+  if (special) renderSpecial(m);
+  const list = dishes();
+  (special ? [] : list).forEach((it, i) => {
+    const r = document.createElement("div"), n = document.createElement("span"), p = document.createElement("span");
+    n.textContent = it.name; p.textContent = it.price; p.style.color = pal.c;
+    if (layout === "menu") {
+      r.className = "flex justify-between items-center gap-3 bg-black/20 px-4 rounded-xl border border-white/10 " + big;
+      n.className = "font-semibold"; p.className = "font-bold whitespace-nowrap";
+    } else if (layout === "board") {
+      r.className = "flex items-baseline gap-2 border-b-2 border-dotted border-white/40 " + big;
+      n.className = "font-semibold"; p.className = "font-bold ml-auto whitespace-nowrap";
+    } else {
+      const lone = list.length % 2 === 1 && i === list.length - 1;      // an odd last dish stays the same size, centred
+      r.className = "flex flex-col items-center justify-center text-center gap-1 rounded-2xl bg-black/25 border border-white/10 px-3 " + big + (lone ? " col-span-2 justify-self-center w-[calc(50%-0.375rem)]" : "");
+      n.className = "font-semibold"; p.className = "font-black text-xl";
+    }
+    r.append(n, p); m.appendChild(r);
+  });
+  if (!dishes().length) {
+    const ph = document.createElement("div"); ph.className = "col-span-2 text-center text-sm opacity-70 py-6";
+    ph.textContent = T("មុខម្ហូបរបស់អ្នកនឹងបង្ហាញនៅទីនេះ / Your dishes will appear here"); m.appendChild(ph);
+  }
+  const q = $("pQRs"); q.innerHTML = "";
+  if (payImg) makeQR(q, payImg, $("payLabel").value || "Scan to pay", true);
+  const link = $("qrLink").value.trim();
+  if (link) makeQR(q, link, $("linkLabel").value || "Scan", false);
+  $("pPhone").parentElement.parentElement.style.display = ($("phone").value || q.children.length) ? "flex" : "none";
+}
+
+function readImage(file, cb) { const r = new FileReader(); r.onload = e => cb(e.target.result); r.readAsDataURL(file); }
+$("payFile").onchange = e => e.target.files[0] && readImage(e.target.files[0], d => { payImg = d; render(); });
+function clearPay() { payImg = null; $("payFile").value = ""; render(); }
+$("photoFile").onchange = e => e.target.files[0] && readImage(e.target.files[0], d => {
+  photoSrc = d; $("photoImg").src = d; render(); $("photoImg").classList.remove("hidden"); $("photoPh").classList.add("hidden"); });
+
+["shop", "tagline", "phone", "badge", "callout", "info", "payLabel", "qrLink", "linkLabel"].forEach(id => $(id).addEventListener("input", render));
+
+
+function downloadPoster() {
+  if (typeof html2canvas === "undefined") { $("dlNote").textContent = "Download tool did not load. Check your internet."; return; }
+  html2canvas($("poster"), {scale: 2, useCORS: true}).then(c => {
+    const a = document.createElement("a"); a.download = "street-vendor-poster.png"; a.href = c.toDataURL("image/png"); a.click();
+  });
+}
+
+/* ---------- Extra poster types (original designs in the style of food-truck, festival and big-photo posters) ---------- */
+function renderSpecial(m) {
+  const mk = (tag, cls, txt) => { const e = document.createElement(tag); e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  if (layout === "truck") {                      // menu grouped under bold section headers
+    m.className = "relative z-10 my-5 flex-1 flex flex-col justify-center gap-4";
+    const groups = {};
+    dishes().forEach(it => { const g = it.cat || T("ម៉ឺនុយ / MENU"); (groups[g] = groups[g] || []).push(it); });
+    Object.entries(groups).forEach(([g, list]) => {
+      const box = mk("div", "");
+      const h = mk("div", "inline-block bg-black/50 px-3 py-1 text-xl font-black uppercase mb-1", g);
+      h.style.borderLeft = "6px solid " + pal.c; box.appendChild(h);
+      list.forEach(it => {
+        const r = mk("div", "flex items-baseline gap-2 text-sm"), p = mk("span", "font-bold", it.price);
+        p.style.color = pal.c;
+        r.append(mk("span", "font-semibold", it.name), mk("span", "flex-1 border-b border-dotted border-white/40"), p);
+        box.appendChild(r);
+      });
+      m.appendChild(box);
+    });
+  } else if (layout === "festival") {            // starburst, date line and dish chips
+    $("pShop").className = "text-3xl font-black italic text-center leading-tight drop-shadow-md";
+    m.className = "relative z-10 my-5 flex-1 flex flex-col items-center justify-center gap-3 text-center";
+    const star = mk("div", "flex items-center justify-center font-black text-xl text-stone-900 px-8", $("callout").value || T("ចាប់ផ្តើម / Start now"));
+    star.style.cssText = "background:" + pal.c + ";width:180px;height:160px;clip-path:polygon(50% 0%,61% 18%,80% 8%,79% 30%,100% 35%,86% 52%,98% 72%,76% 74%,70% 96%,50% 83%,30% 96%,24% 74%,2% 72%,14% 52%,0% 35%,21% 30%,20% 8%,39% 18%)";
+    const chips = mk("div", "flex flex-wrap justify-center gap-2");
+    dishes().forEach(it => { const c = mk("span", "px-3 py-1 rounded-full text-xs font-bold text-stone-900", it.name + (it.price ? " · " + it.price : "")); c.style.background = pal.c; chips.appendChild(c); });
+    m.append(star, mk("div", "text-sm font-semibold", $("info").value), chips);
+  } else {                                       // hero: huge name, big photo, compact list
+    $("pShop").className = "text-5xl uppercase font-black leading-none tracking-tight break-words";
+    m.className = "relative z-10 my-4 flex-1 flex flex-col gap-3";
+    const ph = mk("div", "rounded-[40px] overflow-hidden flex items-center justify-center h-44 text-7xl");
+    ph.style.background = pal.c;
+    if (photoSrc) { const im = mk("img", "w-full h-full object-cover"); im.src = photoSrc; ph.appendChild(im); } else ph.textContent = "🍽️";
+    m.appendChild(ph);
+    dishes().forEach(it => {
+      const r = mk("div", "flex justify-between gap-2 text-sm font-semibold border-b border-white/30 pb-1"), p = mk("span", "font-bold", it.price);
+      p.style.color = pal.c; r.append(mk("span", "", it.name), p); m.appendChild(r);
+    });
+    if ($("info").value) m.appendChild(mk("div", "text-xs font-bold", $("info").value));
+  }
+}
+(function () {                                   // little flags for the festival top edge
+  const cols = ["#ef4444", "#facc15", "#22c55e", "#3b82f6", "#ec4899", "#f97316", "#a855f7", "#14b8a6", "#ef4444", "#facc15"];
+  cols.forEach(c => { const f = document.createElement("div"); f.style.cssText = `width:30px;height:26px;background:${c};clip-path:polygon(0 0,100% 0,50% 100%)`; $("bunting").appendChild(f); });
+})();
+
+/* ---------- "Tell the AI what you want" ---------- */
+async function askAI(prompt, search) {   // search = let the server use Google Search for design ideas
+  const r = await fetch(AI_ENDPOINT, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({prompt, search: !!search})});
+  if (!r.ok) throw new Error("AI request failed");
+  return JSON.parse(String((await r.json()).text).replace(/```json|```/g, "").trim());
+}
+function posterPrompt(t) {
+  return `You design posters for small street food vendors. The vendor wrote: "${t}"
+First, if you can search the web, look up current menu and food-poster design ideas for this kind of shop and occasion. Use them only as inspiration for the layout choice, colors, mood and wording. Never copy a specific poster, text, logo or photo.
+Reply ONLY with JSON: {"shop":"","tagline":"max 8 words","badge":"short sticker text with 1 emoji","callout":"2-3 words for a big starburst","info":"date, time or address if given, else empty","layout":"menu|cards|board|promo|truck|festival|hero","idea":"one short sentence on why this design suits the shop","palette":{"a":"#hex top background","b":"#hex bottom background","e":"#hex border","c":"#hex accent for prices"},"items":[{"name":"","price":"","category":""}]}
+Rules: if the vendor names a color in any language (such as pink or ពណ៌ផ្កាឈូក) the palette must truly look that color; use dark backgrounds with a bright accent, or light backgrounds with a dark accent. Write in the same language as the vendor (Khmer if they wrote Khmer; if unsure use ${lang.v === "km" ? "Khmer" : "English"}). Use ONLY the items, prices, dates and phone numbers the vendor gave; if none was given use "". Never invent prices or ingredients. Layouts: "promo" for sales and offers, "festival" for events and openings, "truck" whenever the dishes belong to 2 or more types such as drinks, rice, noodles or desserts (fill category for every dish, in the vendor's language), "hero" for one signature dish with a photo, "board" for plain price lists, "cards" for 4 or fewer items, otherwise "menu".`;
+}
+const CATS = [   // basic dish grouping for demo mode: [pattern, heading]
+  [/coffee|tea|juice|smoothie|drink|milk|soda|water|កាហ្វេ|តែ|ទឹក|ភេសជ្ជៈ/i, "ភេសជ្ជៈ / Drinks"],
+  [/noodle|ramen|pho|គុយទាវ|មី|នំបញ្ចុក/i, "មី / Noodles"],
+  [/cake|dessert|ice ?cream|sweet|នំ|ការ៉េម|បង្អែម/i, "បង្អែម / Desserts"],
+  [/rice|បាយ/i, "បាយ / Rice"],
+  [/beef|pork|chicken|fish|meat|grill|soup|សាច់|គោ|ជ្រូក|មាន់|ត្រី|សម្ល/i, "សាច់ និងម្ហូប / Meat and dishes"]
+];
+function offlineParse(t) {   // basic keyword version, used when no AI is connected
+  const PRICE = /(\$[\d០-៩]+(?:\.[\d០-៩]+)?|[\d០-៩][\d០-៩,.]*\s*(?:៛|riel|usd|\$)|[\d០-៩]{3,}[\d០-៩,.]*)/gi;
+  const clean = t.replace(/ពណ[\u17CB-\u17D0]?\s*\S*/g, " ").replace(/\b[\w-]+\s+colou?rs?\b/gi, " ").replace(/ផ្ទាំង\S*|បើកហាង\S*|grand opening|poster/gi, " ");
+  const items = []; let last = 0;
+  for (const m of clean.matchAll(PRICE)) {            // every price ends one dish; the words before it are its name
+    const name = clean.slice(last, m.index).split(/[,;\n]+/).pop().replace(/^.*:\s*/, "").replace(/\-\s*$/, "").trim();
+    last = m.index + m[0].length;
+    if (name) { const c = CATS.find(x => x[0].test(name)); items.push({name, price: m[0].trim().replace(/[,.]+$/, ""), cat: c ? T(c[1]) : ""}); }
+  }
+  const groups = new Set(items.map(i => i.cat).filter(Boolean));
+  const promo = /open|sale|promo|discount|free|buy\s*1|បើក|បញ្ចុះតម្លៃ|ថ្មី/i.test(t);
+  const named = /festival|event|party|ពិធី|បុណ្យ/i.test(t) ? "festival" : promo ? "promo" : /delivery|burger|hot ?dog|pizza|photo|រូប/i.test(t) ? "hero" : /board|price list|ក្តារ/i.test(t) ? "board" : null;
+  const guess = named || (items.length ? (groups.size >= 2 || items.length >= 7 ? "truck" : items.length <= 4 ? "cards" : "menu") : null);   // null = leave the poster type alone
+  const badge = /buy\s*1|ទិញ\s*១/i.test(t) ? T("🥤 ទិញ ១ ថែម ១ / 🥤 Buy 1 Get 1") : /open|បើក/i.test(t) ? T("🎉 ពិធីបើកហាង / 🎉 Grand Opening") : /free|ឥតគិតថ្លៃ/i.test(t) ? T("🎁 ឥតគិតថ្លៃ / 🎁 Free") : /spic|ហឹរ/i.test(t) ? T("🌶️ ហឹរខ្លាំង / 🌶️ Super spicy") : items.length ? T("🔥 ពេញនិយម / 🔥 Hot Pick") : null;
+  return {layout: guess, badge, palette: colorFromText(t), items};
+}
+function applyDesign(d) {
+  if (d.shop) $("shop").value = d.shop;
+  if (d.tagline != null) $("tagline").value = d.tagline;
+  if (d.badge != null) $("badge").value = d.badge;
+  if (d.callout) $("callout").value = d.callout;
+  if (d.info != null) $("info").value = d.info;
+  if (LAYOUTS.some(l => l[0] === d.layout)) layout = d.layout;
+  const items = (d.items || []).filter(i => i && i.name).map(i => ({name: String(i.name), price: String(i.price || ""), cat: String(i.category || i.cat || "")}));
+  if (items.length) { menu = items; renderInputs(); }
+  const p = d.palette;
+  renderLayouts();
+  if (p && [p.a, p.b, p.e, p.c].every(hexOk)) addPalette(fitPalette(p)); else render();
+}
+async function generateFromPrompt() {
+  const text = $("ask").value.trim();
+  if (!text) { $("askNote").textContent = "សូមសរសេរអ្វីដែលអ្នកចង់បានសិន / Type what you want first."; return; }
+  $("askBtn").disabled = true; $("askNote").textContent = "កំពុងបង្កើត… / Creating…";
+  let d, note = "";
+  try {
+    if (!AI_ENDPOINT) throw new Error("offline");
+    d = await askAI(posterPrompt(text), true);
+    if (!Array.isArray(d.items)) throw new Error("bad format");
+    if (d.idea) note = "💡 " + d.idea;
+  } catch (e) {
+    d = offlineParse(text);
+    note = AI_ENDPOINT ? "AI was unavailable, so the basic keyword version was used." : "Demo mode: basic keyword version. Set AI_ENDPOINT for full AI.";
+  }
+  applyDesign(d);
+  showPoster();
+  $("askNote").textContent = note || "រួចរាល់! ពិនិត្យអក្ខរាវិរុទ្ធ និងតម្លៃ / Done! Check spelling and prices.";
+  $("askBtn").disabled = false;
+}
+
+/* ---------- two pages: 1) welcome + login, 2) studio ---------- */
+const getUser = () => { try { return JSON.parse(localStorage.getItem("vendorUser") || "null"); } catch (e) { return null; } };
+function showPage(v) {                               // "login" or "studio"
+  $("view-login").classList.toggle("hidden", v !== "login");
+  $("view-studio").classList.toggle("hidden", v !== "studio");
+  $("logoutBtn").classList.toggle("hidden", v !== "studio");
+  window.scrollTo(0, 0);
+}
+function login() {
+  const shop = $("loginShop").value.trim();
+  if (!shop) { $("loginNote").textContent = "សូមបញ្ចូលឈ្មោះហាងសិន / Please enter your shop name first."; $("loginShop").focus(); return; }
+  const user = {shop, phone: $("loginPhone").value.trim()};
+  try { localStorage.setItem("vendorUser", JSON.stringify(user)); } catch (e) {}   // remembered on this device if allowed
+  welcome(user, 1400);
+}
+function freshStart(user) {           // sample content is cleared so only the vendor's own details are ever on the poster
+  menu = [{name: "", price: "", cat: ""}];
+  $("phone").value = user.phone || ""; $("tagline").value = ""; $("qrLink").value = ""; $("info").value = "";
+  renderInputs();
+}
+function welcome(user, delay) {                      // greeting, then page 2 opens by itself
+  $("loginForm").classList.add("hidden"); $("welcome").classList.remove("hidden");
+  $("welcomeName").textContent = user.shop;
+  setTimeout(() => {
+    $("shop").value = user.shop; freshStart(user);
+    render(); showPage("studio");
+    $("welcome").classList.add("hidden"); $("loginForm").classList.remove("hidden");
+  }, delay);
+}
+function logout() { try { localStorage.removeItem("vendorUser"); } catch (e) {} $("loginShop").value = ""; $("loginPhone").value = ""; showPage("login"); }
+function start() { const u = getUser(); if (u) welcome(u, 900); else showPage("login"); }
+
+function saveImg(id, name) {
+  html2canvas($(id), {scale: 2, useCORS: true}).then(c => { const a = document.createElement("a"); a.download = name; a.href = c.toDataURL("image/png"); a.click(); });
+}
+
+/* ---------- the studio as 4 simple steps (the AI box becomes an optional shortcut) ---------- */
+const STEP_TITLES = ["1. រូបរាង / 1. Look", "2. ហាង / 2. Shop", "3. មុខម្ហូប / 3. Menu", "4. QR និង Telegram / 4. QR and Telegram"];
+let step = 0;
+const PHOTO_LBL = "រូបថតហាង ឬម្ចាស់ / Photo of your shop or yourself", AI_SUM = "✨ ឬប្រាប់ AI ជាប្រយោគមួយ / Or tell the AI in one sentence (optional)";
+function buildSteps() {
+  const col = $("leftCol"), sec = id => $(id).closest("section");
+  const photo = $("photoFile"), photoLabel = photo.previousElementSibling;       // photo moves from Menu to Shop
+  photoLabel.id = "photoLabel"; photoLabel.textContent = T(PHOTO_LBL); sec("shop").append(photoLabel, photo);
+  const ai = document.createElement("details"); ai.className = "bg-slate-800 border border-orange-500/40 rounded-xl";
+  const sum = document.createElement("summary"); sum.className = "cursor-pointer text-sm font-bold p-4";
+  sum.id = "aiSum"; sum.textContent = T(AI_SUM); ai.append(sum, sec("ask"));
+  const groups = [[sec("layouts"), sec("swatches")], [sec("shop")], [sec("menuInputs")], [sec("payFile")]];
+  const body = document.createElement("div"); body.id = "stepBody";
+  groups.forEach(g => { const d = document.createElement("div"); d.className = "step space-y-5 hidden"; g.forEach(x => d.appendChild(x)); body.appendChild(d); });
+  const bar = document.createElement("div"); bar.id = "stepBar"; bar.className = "grid grid-cols-4 gap-1";
+  STEP_TITLES.forEach((t, i) => { const b = document.createElement("button"); b.className = "py-2 rounded-lg text-xs font-bold"; b.textContent = t; b.onclick = () => showStep(i); bar.appendChild(b); });
+  const nav = document.createElement("div"); nav.className = "flex gap-2";
+  nav.innerHTML = '<button id="backBtn" class="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold">←</button>' +
+                  '<button id="nextBtn" class="flex-1 py-3 bg-orange-500 hover:bg-orange-600 rounded-xl font-bold"></button>' +
+                  '<button id="seeBtn" class="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold lg:hidden" aria-label="See poster">👁</button>';
+  col.querySelector("details")?.remove();          // the old "fine-tune" box is no longer needed
+  col.append(ai, bar, body, nav);
+  $("backBtn").onclick = () => showStep(step - 1);
+  $("nextBtn").onclick = () => step === 3 ? downloadPoster() : showStep(step + 1);
+  $("seeBtn").onclick = showPoster;
+  showStep(0);
+}
+function showStep(i) {
+  step = Math.max(0, Math.min(3, i));
+  document.querySelectorAll("#stepBody .step").forEach((d, k) => d.classList.toggle("hidden", k !== step));
+  [...$("stepBar").children].forEach((b, k) => { b.textContent = T(STEP_TITLES[k]); b.className = "py-2 rounded-lg text-xs font-bold " + (k === step ? "bg-orange-500" : "bg-slate-800 border border-slate-700"); });
+  $("aiSum").textContent = T(AI_SUM); $("photoLabel").textContent = T(PHOTO_LBL);
+  $("backBtn").style.visibility = step === 0 ? "hidden" : "visible";
+  $("nextBtn").textContent = T(step === 3 ? "📥 ទាញយក / Download poster" : "បន្ទាប់ / Next →");
+}
+
+wrapBilingual(); lockNotes(); renderInputs(); renderSwatches(); renderLayouts(); applyPalette(); buildSteps(); setLang(lang.v); start();
+</script>
+</body>
+</html>
