@@ -364,12 +364,17 @@ async function aiPalette() {
     const prompt = `Design a poster colour palette for a street food shop. Mood or shop: "${v}".
 Reply ONLY with JSON: {"a":"#hex top background","b":"#hex bottom background","e":"#hex border","c":"#hex accent"}.
 Match any color named in any language (pink must really look pink). Use either dark backgrounds with bright border and accent, or light backgrounds with a dark accent.`;
-    const t = await askAI(prompt);
-    if (![t.a, t.b, t.e, t.c].every(hexOk)) throw new Error("bad colors");
+    const t = await askAI(prompt, false);
+    if (![t.a, t.b, t.e, t.c].every(hexOk)) throw new Error("Gemini returned invalid color values.");
     addPalette(fitPalette(t));
     $("colorNote").textContent = "AI colors applied.";
-  } catch (err) { newRandomPalette(); $("colorNote").textContent = "AI was unavailable, so random colors were used."; }
-  $("aiBtn").disabled = false;
+  } catch (err) {
+    newRandomPalette();
+    const detail = String(err && err.message ? err.message : err).slice(0, 220);
+    $("colorNote").textContent = "AI unavailable; random colors used. Details: " + detail;
+  } finally {
+    $("aiBtn").disabled = false;
+  }
 }
 function addPalette(p) { palettes.push(p); if (palettes.length > 18) palettes.splice(6, 1); pal = p; renderSwatches(); applyPalette(); showPoster(); }
 function renderSwatches() {
@@ -528,10 +533,36 @@ function renderSpecial(m) {
 })();
 
 /* ---------- "Tell the AI what you want" ---------- */
-async function askAI(prompt, search) {   // search = let the server use Google Search for design ideas
-  const r = await fetch(AI_ENDPOINT, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({prompt, search: !!search})});
-  if (!r.ok) throw new Error("AI request failed");
-  return JSON.parse(String((await r.json()).text).replace(/```json|```/g, "").trim());
+async function askAI(prompt, search = false) {
+  // Send the prompt to the Cloudflare Worker and preserve the real error for debugging.
+  const r = await fetch(AI_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, search: !!search })
+  });
+
+  const responseText = await r.text();
+  if (!r.ok) {
+    throw new Error(`Worker returned HTTP ${r.status}: ${responseText.slice(0, 500)}`);
+  }
+
+  let data;
+  try {
+    data = JSON.parse(responseText);
+  } catch (err) {
+    throw new Error("Worker returned a response that was not valid JSON.");
+  }
+
+  if (typeof data.text !== "string" || !data.text.trim()) {
+    throw new Error("Worker response did not contain generated text.");
+  }
+
+  const cleaned = data.text.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error("Gemini response was not valid JSON: " + cleaned.slice(0, 180));
+  }
 }
 function posterPrompt(t) {
   return `You design posters for small street food vendors. The vendor wrote: "${t}"
