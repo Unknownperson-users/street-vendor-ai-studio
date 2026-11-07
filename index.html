@@ -168,6 +168,41 @@ body.lang-en .km{display:none}
   <p id="dlNote" class="text-xs text-slate-400"></p>
 </div>
 </main>
+<!-- AI caption generator -->
+<section id="capBox" class="max-w-2xl mx-auto px-4 mt-8">
+  <div class="bg-slate-800 border border-orange-500/40 rounded-xl p-5 space-y-3">
+    <h3 class="text-base font-bold">📝 សរសេរប្រកាសសម្រាប់ហាង / Write a post for your shop</h3>
+    <p class="text-xs text-slate-400">AI ប្រើឈ្មោះហាង និងមុខម្ហូបពីផ្ទាំងខាងលើ។ តម្លៃត្រូវបានចម្លងត្រឹមត្រូវ AI មិនកែទេ។<br>The AI uses your shop name and dishes from the poster. Your prices are copied exactly. The AI never changes them.</p>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label for="capLang" class="text-xs font-semibold block mb-1">ភាសា / Language</label>
+        <select id="capLang" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"></select>
+      </div>
+      <div>
+        <label for="capPlat" class="text-xs font-semibold block mb-1">កន្លែងបង្ហោះ / Platform</label>
+        <select id="capPlat" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"></select>
+      </div>
+    </div>
+    <div>
+      <label for="capTone" class="text-xs font-semibold block mb-1">ស្ទីល / Tone</label>
+      <select id="capTone" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"></select>
+    </div>
+    <div>
+      <label for="capNotes" class="text-xs font-semibold block mb-1">អ្វីដែលចង់បញ្ជាក់ (ជម្រើស) / Anything to mention (optional)</label>
+      <textarea id="capNotes" rows="2" maxlength="300" placeholder="ឧ. ចូលមកសាកល្បងថ្ងៃនេះ / e.g. Come try us today" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"></textarea>
+    </div>
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" id="capPrices" checked class="w-4 h-4">
+      <span>ដាក់មុខម្ហូប និងតម្លៃ / Include dishes and prices</span>
+    </label>
+    <button id="capBtn" class="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 rounded-lg font-bold"><span id="capSpin" style="display:none" class="w-4 h-4 mr-2 border-2 border-white/40 border-t-white rounded-full animate-spin align-middle"></span>✨ សរសេរប្រកាស / Write my post</button>
+    <p id="capNote" class="text-xs text-slate-400 min-h-4"></p>
+    <div id="capOut" class="hidden space-y-2">
+      <textarea id="capText" rows="10" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm leading-relaxed"></textarea>
+      <button id="capCopy" class="w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-semibold">📋 ចម្លង / Copy post</button>
+    </div>
+  </div>
+</section>
 </div>
 
 
@@ -227,7 +262,7 @@ function T(s) {          // "ខ្មែរ / English" -> the chosen half; Engl
 }
 function lockNotes() {   // every message written into these boxes is shown in the chosen language
   const d = Object.getOwnPropertyDescriptor(Node.prototype, "textContent");
-  ["askNote", "colorNote", "loginNote", "dlNote"].forEach(id => Object.defineProperty($(id), "textContent", {get() { return d.get.call(this); }, set(v) { d.set.call(this, T(String(v))); }}));
+  ["askNote", "colorNote", "loginNote", "dlNote", "capNote"].forEach(id => Object.defineProperty($(id), "textContent", {get() { return d.get.call(this); }, set(v) { d.set.call(this, T(String(v))); }}));
 }
 function wrapBilingual() {   // runs once: splits every "ខ្មែរ / English" text in the page into two spans
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT), nodes = [];
@@ -264,7 +299,7 @@ function setLang(v) {
   $("langKm").className = "px-3 py-1.5 " + (v === "km" ? "bg-orange-500" : "bg-slate-800");
   $("langEn").className = "px-3 py-1.5 " + (v === "en" ? "bg-orange-500" : "bg-slate-800");
   Object.entries(DEFAULTS).forEach(([id, d]) => { if ([d.km, d.en].includes($(id).value)) $(id).value = d[v]; });
-  renderInputs(); renderLayouts(); renderBadgeBtns(); setPlaceholders();
+  renderInputs(); renderLayouts(); renderBadgeBtns(); setPlaceholders(); renderCapOptions();
   if ($("stepBar")) showStep(step);
   render();
 }
@@ -697,7 +732,109 @@ function showStep(i) {
   $("backBtn").style.visibility = step === 0 ? "hidden" : "visible";
   $("nextBtn").textContent = T(step === 3 ? "📥 ទាញយក / Download poster" : "បន្ទាប់ / Next →");
 }
+/* ---------- AI caption generator (Facebook / Instagram) ---------- */
+const CAP_LANGS = [["Khmer", "ខ្មែរ"], ["English", "English"], ["both Khmer and English", "ខ្មែរ + English"]];
+const CAP_PLATS = [["Facebook", "Facebook"], ["Instagram", "Instagram"]];
+const CAP_TONES = [
+  ["friendly and warm", "រាក់ទាក់ / Friendly"],
+  ["fun and playful", "សប្បាយរីករាយ / Fun"],
+  ["professional and clean", "ផ្លូវការ / Professional"],
+  ["exciting, inviting people to visit", "អញ្ជើញមកទិញ / Inviting"]
+];
+function fillSelect(id, list) {
+  const s = $(id), keep = s.value; s.innerHTML = "";
+  list.forEach(([v, label]) => { const o = document.createElement("option"); o.value = v; o.textContent = T(label); s.appendChild(o); });
+  if (keep) s.value = keep;
+}
+function renderCapOptions() {
+  const first = !$("capLang").options.length;
+  fillSelect("capLang", CAP_LANGS); fillSelect("capPlat", CAP_PLATS); fillSelect("capTone", CAP_TONES);
+  if (first) $("capLang").value = lang.v === "km" ? "Khmer" : "English";
+}
+const capItems = () => dishes().slice(0, 8);
 
+function capPrompt() {
+  const plat = $("capPlat").value, names = capItems().map(i => "- " + i.name.trim()).join("\n") || "(none)";
+  return `You write social media posts for a small street food or drink vendor in Cambodia.
+Write ONE ${plat} post in ${$("capLang").value}. If both languages are requested, write Khmer first, then English below it.
+Tone: ${$("capTone").value}.
+Shop name: ${$("shop").value.trim() || "(not given)"}
+Tagline (use only if it helps): ${$("tagline").value.trim() || "(none)"}
+Dishes (names only):
+${names}
+Extra note from the vendor: ${$("capNotes").value.trim().slice(0, 300) || "(none)"}
+
+Strict rules:
+- Use simple, natural wording like a real vendor. Khmer must sound natural, not like a word-for-word translation.
+- Write 2 to 4 short lines, under 90 words for each language, then hashtags.
+- Add 2 to 4 fitting emojis.
+- End with ${plat === "Instagram" ? "5 to 8" : "2 to 4"} relevant hashtags on the last line.
+- NEVER write any price, phone number, link, address or opening hours. The app adds those itself.
+- NEVER mention discounts, free items, offers or promotions, unless the vendor's extra note clearly says so. If it does, copy that wording exactly.
+- Do not invent facts such as awards, ingredients, history or locations.
+${$("capPrices").checked ? "- Put the exact text [MENU] on its own line where the dish list should appear." : "- Do not mention any dish prices."}
+Return only the post text, with no explanation and no quotation marks.`;
+}
+
+async function askCaptionText(prompt) {
+  if (!AI_ENDPOINT) throw new Error("AI_ENDPOINT is empty.");
+  const r = await fetch(AI_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, search: false })
+  });
+  const raw = await r.text();
+  if (!r.ok) throw new Error("Worker returned HTTP " + r.status + ": " + raw.slice(0, 300));
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { throw new Error("Worker response was not valid JSON."); }
+  if (typeof data.text !== "string" || !data.text.trim()) throw new Error("The AI sent an empty answer.");
+  return data.text.replace(/```[a-z]*/gi, "").trim();
+}
+
+// Prices, phone, link and hours are copied from the poster fields by code. The AI never writes them.
+function capAssemble(body, withMenu) {
+  let text = body.trim().replace(/\r/g, "");
+  let tags = "";
+  const m = text.match(/\n*((?:#[^\s#]+\s*)+)$/);
+  if (m) { tags = m[1].trim(); text = text.slice(0, m.index).trim(); }
+  if (withMenu) {
+    const lines = capItems().map(i => "• " + i.name.trim() + ((i.price || "").trim() ? " – " + i.price.trim() : "")).join("\n");
+    text = text.includes("[MENU]") ? text.replace("[MENU]", () => lines) : text + (lines ? "\n\n" + lines : "");
+  } else {
+    text = text.replace(/\[MENU\]/g, "").trim();
+  }
+  const foot = [];
+  if ($("info").value.trim()) foot.push("🕒 " + $("info").value.trim());
+  if ($("phone").value.trim()) foot.push("☎️ " + $("phone").value.trim());
+  if ($("qrLink").value.trim()) foot.push("🔗 " + $("qrLink").value.trim());
+  return [text, foot.join("\n"), tags].filter(Boolean).join("\n\n");
+}
+
+async function writeCaption() {
+  if (!$("shop").value.trim() && !capItems().length) {
+    $("capNote").textContent = "សូមបញ្ចូលឈ្មោះហាង ឬមុខម្ហូបសិន / Add your shop name or a dish first.";
+    return;
+  }
+  $("capBtn").disabled = true; $("capSpin").style.display = "inline-block"; $("capOut").classList.add("hidden");
+  $("capNote").textContent = "កំពុងសរសេរ… / Writing your post…";
+  try {
+    const body = await askCaptionText(capPrompt());
+    $("capText").value = capAssemble(body, $("capPrices").checked);
+    $("capOut").classList.remove("hidden");
+    $("capNote").textContent = "រួចរាល់! សូមពិនិត្យមុនបង្ហោះ / Done! Please check it before you post.";
+  } catch (e) {
+    $("capNote").textContent = "AI មិនអាចសរសេរបាន សូមព្យាយាមម្តងទៀត។ / AI could not write the post. Please try again. Details: " + String(e && e.message ? e.message : e).slice(0, 200);
+  } finally {
+    $("capBtn").disabled = false; $("capSpin").style.display = "none";
+  }
+}
+async function copyCaption() {
+  const t = $("capText");
+  try { await navigator.clipboard.writeText(t.value); } catch (e) { t.select(); document.execCommand("copy"); }
+  $("capNote").textContent = "បានចម្លង! / Copied!";
+}
+$("capBtn").onclick = writeCaption;
+$("capCopy").onclick = copyCaption;
 wrapBilingual(); lockNotes(); renderInputs(); renderSwatches(); renderLayouts(); applyPalette(); buildSteps(); setLang(lang.v); start();
 </script>
 </body>
